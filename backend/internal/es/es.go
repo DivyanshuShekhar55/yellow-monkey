@@ -6,6 +6,26 @@ import (
 	"github.com/elastic/go-elasticsearch/v9"
 )
 
+type ESClient struct {
+	Conn *elasticsearch.Client
+	Users UserFn
+}
+
+func NewESClient() *ESClient {
+	conn := ConnectES()
+	if conn == nil { return nil }
+
+	return &ESClient{
+		Conn: conn,
+		Users: &UserImpl{Conn: conn},
+	}
+}
+
+type UserFn interface {
+	CreateUserIndex()
+	PutUser()
+}
+
 func ConnectES() *elasticsearch.Client{
 	cfg := elasticsearch.Config{
 		Addresses: []string{

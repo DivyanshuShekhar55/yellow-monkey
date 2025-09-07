@@ -19,7 +19,11 @@ type User struct {
 	Location Coords `json:"location"`
 }
 
-func CreateUserIndex(es *elasticsearch.Client) {
+type UserImpl struct {
+	Conn *elasticsearch.Client
+}
+
+func (u *UserImpl) CreateUserIndex() {
 
 	index := "users"
 
@@ -28,7 +32,7 @@ func CreateUserIndex(es *elasticsearch.Client) {
 		Index: []string{index},
 	}
 
-	res, err := req.Do(context.Background(), es)
+	res, err := req.Do(context.Background(), u.Conn)
 
 	if err != nil {
 		log.Printf("error checking existence of user index %s", err)
@@ -58,7 +62,7 @@ func CreateUserIndex(es *elasticsearch.Client) {
 			Body:  strings.NewReader(mapping),
 		}
 
-		res, err := req.Do(context.Background(), es)
+		res, err := req.Do(context.Background(), u.Conn)
 		if err != nil {
 			log.Printf("Error creating user index %v", err)
 			return
@@ -77,6 +81,6 @@ func CreateUserIndex(es *elasticsearch.Client) {
 	}
 }
 
+func (u *UserImpl) PutUser() {
 
-
-
+}
