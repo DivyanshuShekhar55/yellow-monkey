@@ -7,26 +7,28 @@ import (
 )
 
 type ESClient struct {
-	Conn *elasticsearch.Client
+	Conn  *elasticsearch.Client
 	Users UserFn
 }
 
 func NewESClient() *ESClient {
 	conn := ConnectES()
-	if conn == nil { return nil }
+	if conn == nil {
+		return nil
+	}
 
 	return &ESClient{
-		Conn: conn,
+		Conn:  conn,
 		Users: &UserImpl{Conn: conn},
 	}
 }
 
 type UserFn interface {
 	CreateUserIndex()
-	PutUser()
+	PutUser(user User)
 }
 
-func ConnectES() *elasticsearch.Client{
+func ConnectES() *elasticsearch.Client {
 	cfg := elasticsearch.Config{
 		Addresses: []string{
 			"http://localhost:9200",
@@ -40,8 +42,8 @@ func ConnectES() *elasticsearch.Client{
 		return nil
 	}
 
-	res, err:= es.Info()
-	if err!=nil{
+	res, err := es.Info()
+	if err != nil {
 		// retry or other logic
 		log.Fatal("couldn't get info from elastic")
 		return nil
@@ -51,4 +53,3 @@ func ConnectES() *elasticsearch.Client{
 	return es
 
 }
-

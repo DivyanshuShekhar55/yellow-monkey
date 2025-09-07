@@ -2,6 +2,7 @@ package es
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 
@@ -71,16 +72,76 @@ func (u *UserImpl) CreateUserIndex() {
 		defer res.Body.Close()
 
 		if res.IsError() {
-			log.Printf("Error creating user index %v", err)
+			log.Printf("Error creating user index %v", res.String())
 			return
 		}
 
 		log.Printf("created user index")
+		log.Printf("user index succesfully created")
+
 	} else {
 		log.Printf("User index already exists")
 	}
 }
 
-func (u *UserImpl) PutUser() {
+func (u *UserImpl) PutUser(user User) {
+	doc := `{
+		"username": username,
+		"location": {
+			"lat": lat,
+			"lon": lon
+		}  
+	}`
+
+	req := esapi.IndexRequest{
+		Index:   "users",
+		Body:    strings.NewReader(doc),
+		Refresh: "false",
+	}
+
+	res, err := req.Do(context.Background(), u.Conn)
+	if err != nil {
+		log.Printf("Error indexing user doc %s", err)
+		return
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		log.Printf("error indexing user doc %s", res.String())
+		return
+	}
+
+	log.Printf("user indexed succesfully")
+	fmt.Printf("user indexed succesfully")
+
+}
+
+func (u *UserImpl) SearchUser(user User) *esapi.Response {
+	query := `{
+		"query": {
+			"match": {
+				"": "sample" 
+			}
+		}
+	}`
+
+	req := esapi.SearchRequest{
+		Index: []string{"users"},
+		Body:  strings.NewReader(query),
+	}
+
+	res, err := req.Do(context.Background(), u.Conn)
+	if err != nil {
+		log.Printf("error searching user doc %s", err)
+		return nil
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		log.Printf("error searching user doc %s", res.String())
+		return nil
+	}
+
+	return res
 
 }
