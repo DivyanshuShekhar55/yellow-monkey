@@ -2,6 +2,7 @@ package es
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -18,6 +19,11 @@ type Coords struct {
 type User struct {
 	Username string `json:"username"`
 	Location Coords `json:"location"`
+}
+
+type SearchUserResponse struct {
+	Hits int64
+	Values []User
 }
 
 type UserImpl struct {
@@ -85,17 +91,15 @@ func (u *UserImpl) CreateUserIndex() {
 }
 
 func (u *UserImpl) PutUser(user User) {
-	doc := `{
-		"username": username,
-		"location": {
-			"lat": lat,
-			"lon": lon
-		}  
-	}`
+	doc, err := json.Marshal(user)
+	if err != nil {
+		log.Printf("error marshalling user schema %s", err)
+		return
+	}
 
 	req := esapi.IndexRequest{
 		Index:   "users",
-		Body:    strings.NewReader(doc),
+		Body:    strings.NewReader(string(doc)),
 		Refresh: "false",
 	}
 
@@ -116,18 +120,19 @@ func (u *UserImpl) PutUser(user User) {
 
 }
 
-func (u *UserImpl) SearchUser(user User) *esapi.Response {
-	query := `{
+func (u *UserImpl) SearchUserByUsername(username string) *SearchUserResponse {
+	query := fmt.Sprintf(`{
 		"query": {
 			"match": {
-				"": "sample" 
+				"username": %s
 			}
 		}
-	}`
+	}`, username)
 
 	req := esapi.SearchRequest{
-		Index: []string{"users"},
-		Body:  strings.NewReader(query),
+		Index:          []string{"users"},
+		Body:           strings.NewReader(query),
+		TrackTotalHits: "true",
 	}
 
 	res, err := req.Do(context.Background(), u.Conn)
@@ -142,6 +147,32 @@ func (u *UserImpl) SearchUser(user User) *esapi.Response {
 		return nil
 	}
 
-	return res
+	// parse the response
+	var r struct {
+		Hits struct {
+			Total struct {
+				Value int `json:"value"`
+			} `json:"total"`
+			Hits []struct {
+				Source User `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&r); err!= nil{
+		log.Printf("couldn't parse user response %s in search fn", err)
+		return nil
+	}
+
+	var vals []User
+	for _, hit := range r.Hits.Hits {
+		vals = append(vals, hit.Source)
+	}
+	users := SearchUserResponse {
+		Hits: int64(r.Hits.Total.Value),
+		Values: vals,
+	}
+
+	return &users
 
 }
