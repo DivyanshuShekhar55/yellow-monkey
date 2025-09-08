@@ -32,7 +32,7 @@ type UserFns interface {
 
 type GroupFns interface {
 	CreateGroupIndex()
-	InsertGroup(group Group)
+	InsertGroup(group Group, refreshStrategy string)
 	SearchGroupByLocation(location Coords)
 }
 

@@ -2,6 +2,8 @@ package es
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"strings"
 
@@ -61,22 +63,53 @@ func (g *GroupImpl) CreateGroupIndex() {
 
 		res, err := req.Do(context.Background(), g.Conn)
 		if err != nil {
-			log.Printf("Error creating user index %v", err)
+			log.Printf("Error creating group index %v", err)
 			return
 		}
 
 		defer res.Body.Close()
 
 		if res.IsError() {
-			log.Printf("Error creating user index %v", res.String())
+			log.Printf("Error creating group index %v", res.String())
 			return
 		}
 
-		log.Printf("created user index")
-		log.Printf("user index succesfully created")
+		log.Printf("created group index")
+		log.Printf("group index succesfully created")
+		return
 
 	} else {
-		
+		log.Printf("Group index already exists")
+		return
 	}
 
+}
+
+func (g *GroupImpl) InsertGroup(group *Group, refreshStrategy string) {
+	doc, err := json.Marshal(group)
+	if err != nil {
+		log.Printf("error parsing group %s", err)
+		return
+	}
+
+	req := esapi.IndexRequest{
+		Index:   "groups",
+		Body:    strings.NewReader(string(doc)),
+		Refresh: refreshStrategy, // "false", "should_wait"
+	}
+
+	res, err := req.Do(context.Background(), g.Conn)
+	if err != nil {
+		log.Printf("Error indexing group doc %s", err)
+		return
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		log.Printf("error indexing group doc %s", res.String())
+		return
+	}
+
+	log.Printf("group indexed succesfully")
+	fmt.Printf("group indexed succesfully")
 }
