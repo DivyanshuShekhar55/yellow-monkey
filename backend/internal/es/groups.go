@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -19,6 +20,11 @@ type Group struct {
 
 type GroupImpl struct {
 	Conn *elasticsearch.Client
+}
+
+type GroupSearchResponse struct {
+	Hits   int
+	Values []Group
 }
 
 func (g *GroupImpl) CreateGroupIndex() {
@@ -112,4 +118,99 @@ func (g *GroupImpl) InsertGroup(group *Group, refreshStrategy string) {
 
 	log.Printf("group indexed succesfully")
 	fmt.Printf("group indexed succesfully")
+}
+
+func (g *GroupImpl) SearchGroupByLocation(groupName string, location Coords, minRad, maxRad int, tag ...string) *GroupSearchResponse {
+	// [tags] + [use geohash to filter fast closeby areas only] + [user loc + start dis + end dis (with max limit)] + [name]
+
+	// Prepare tags
+	tags := []string{"tag1", "tag2"}
+	tagsJSON, _ := json.Marshal(tags) // becomes: ["tag1","tag2"]
+
+	// WARNING : GANDMASTI AHEAD
+	queryObj := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"filter": []interface{}{
+					map[string]interface{}{"terms": map[string]interface{}{"tags": tagsJSON}},
+					map[string]interface{}{
+						"location":   map[string]float64{"lat": location.Lat, "lon": location.Lon},
+						"neighbours": true,
+						"precision":  "2km", // level 6 precision, saves space
+					},
+					map[string]interface{}{
+						"geo_distance_range": map[string]interface{}{
+							"gte":      strconv.Itoa(minRad) + "km",
+							"lte":      strconv.Itoa(maxRad) + "km",
+							"location": map[string]float64{"lat": location.Lat, "lon": location.Lon},
+						},
+					},
+				},
+				"should": []interface{}{
+					map[string]interface{}{
+						"match": map[string]interface{}{
+							"name": map[string]interface{}{
+								"query": groupName,
+								"boost": 1.45,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	queryBytes, err := json.Marshal(queryObj)
+	if err != nil {
+		log.Printf("error marshalling group search-query %s", err)
+		return nil
+	}
+
+	req := esapi.SearchRequest{
+		Index:          []string{"groups"},
+		Body:           strings.NewReader(string(queryBytes)),
+		TrackTotalHits: "true",
+	}
+
+	res, err := req.Do(context.Background(), g.Conn)
+	if err != nil {
+		log.Printf("cannot search for group %s", err)
+		return nil
+	}
+
+	defer res.Body.Close()
+
+	if res.IsError() {
+		log.Printf("cannot search for group %s", res.String())
+		return nil
+	}
+
+	// parse the response, bhejne se pahle
+	var r struct {
+		Hits struct {
+			Total struct {
+				Value int `json:"value"`
+			} `json:"total"`
+			Hits []struct {
+				Source Group `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+		log.Printf("error parsing group-serach response %s", err)
+		return nil
+	}
+
+	var vals []Group
+	for _, hit := range r.Hits.Hits {
+		vals = append(vals, hit.Source)
+	}
+
+	search_res := &GroupSearchResponse{
+		Hits:   r.Hits.Total.Value,
+		Values: vals,
+	}
+
+	return search_res
+
 }
