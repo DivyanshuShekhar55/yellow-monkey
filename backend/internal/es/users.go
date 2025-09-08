@@ -22,7 +22,7 @@ type User struct {
 }
 
 type SearchUserResponse struct {
-	Hits int64
+	Hits   int64
 	Values []User
 }
 
@@ -50,6 +50,7 @@ func (u *UserImpl) CreateUserIndex() {
 
 	if res.StatusCode == 404 {
 		// index does not exists
+		// ideally define more options like nnum of shards and stuff 
 		mapping := `{
 			"mappings":{
 			
@@ -121,17 +122,19 @@ func (u *UserImpl) PutUser(user User) {
 }
 
 func (u *UserImpl) SearchUserByUsername(username string) *SearchUserResponse {
-	query := fmt.Sprintf(`{
-		"query": {
-			"match": {
-				"username": %s
-			}
-		}
-	}`, username)
+
+	// this is better than using sprintf
+	query, _ := json.Marshal(map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": map[string]string{
+				"username": username,
+			},
+		},
+	})
 
 	req := esapi.SearchRequest{
 		Index:          []string{"users"},
-		Body:           strings.NewReader(query),
+		Body:           strings.NewReader(string(query)),
 		TrackTotalHits: "true",
 	}
 
@@ -159,7 +162,7 @@ func (u *UserImpl) SearchUserByUsername(username string) *SearchUserResponse {
 		} `json:"hits"`
 	}
 
-	if err := json.NewDecoder(res.Body).Decode(&r); err!= nil{
+	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
 		log.Printf("couldn't parse user response %s in search fn", err)
 		return nil
 	}
@@ -168,8 +171,8 @@ func (u *UserImpl) SearchUserByUsername(username string) *SearchUserResponse {
 	for _, hit := range r.Hits.Hits {
 		vals = append(vals, hit.Source)
 	}
-	users := SearchUserResponse {
-		Hits: int64(r.Hits.Total.Value),
+	users := SearchUserResponse{
+		Hits:   int64(r.Hits.Total.Value),
 		Values: vals,
 	}
 

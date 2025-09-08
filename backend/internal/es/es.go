@@ -8,7 +8,8 @@ import (
 
 type ESClient struct {
 	Conn  *elasticsearch.Client
-	Users UserFn
+	Users UserFns
+	Groups GroupFns
 }
 
 func NewESClient() *ESClient {
@@ -23,9 +24,16 @@ func NewESClient() *ESClient {
 	}
 }
 
-type UserFn interface {
+type UserFns interface {
 	CreateUserIndex()
 	PutUser(user User)
+	SearchUserByUsername(username string) *SearchUserResponse
+}
+
+type GroupFns interface {
+	CreateGroupIndex()
+	InsertGroup(group Group)
+	SearchGroupByLocation(location Coords)
 }
 
 func ConnectES() *elasticsearch.Client {
