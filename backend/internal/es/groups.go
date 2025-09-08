@@ -127,6 +127,8 @@ func (g *GroupImpl) SearchGroupByLocation(groupName string, location Coords, min
 	tags := []string{"tag1", "tag2"}
 	tagsJSON, _ := json.Marshal(tags) // becomes: ["tag1","tag2"]
 
+	maxRad = max(maxRad, 7)
+
 	// WARNING : GANDMASTI AHEAD
 	queryObj := map[string]interface{}{
 		"query": map[string]interface{}{
