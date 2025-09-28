@@ -22,4 +22,5 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	})
 
 	mux.HandleFunc("/groups", h.GetAllGroups)
+	mux.HandleFunc("POST /group", h.CreateGroup)
 }
