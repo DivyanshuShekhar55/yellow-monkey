@@ -56,7 +56,7 @@ func CreateGroupIndex(ctx context.Context, conn *elasticsearch.Client) {
 					"type": "geo_point"
 				},
 				"tags": {
-					"type": []
+					"type": "keyword"
 				}
 			}
 		}
