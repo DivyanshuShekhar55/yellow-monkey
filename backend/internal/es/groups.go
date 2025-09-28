@@ -13,9 +13,9 @@ import (
 )
 
 type Group struct {
-	Name     string
-	Tags     []string // maybe enums??
-	Location Coords
+	Name     string   `json:"name"`
+	Tags     []string `json:"tags"` // maybe enums??
+	Location Coords   `json:"location"`
 }
 
 type GroupImpl struct {
@@ -91,11 +91,11 @@ func CreateGroupIndex(ctx context.Context, conn *elasticsearch.Client) {
 
 }
 
-func InsertGroup(ctx context.Context, conn *elasticsearch.Client, group *Group, refreshStrategy string) {
+func InsertGroup(ctx context.Context, conn *elasticsearch.Client, group *Group, refreshStrategy string) error {
 	doc, err := json.Marshal(group)
 	if err != nil {
 		log.Printf("error parsing group %s", err)
-		return
+		return fmt.Errorf("error parsing group %s", err)
 	}
 
 	req := esapi.IndexRequest{
@@ -107,20 +107,22 @@ func InsertGroup(ctx context.Context, conn *elasticsearch.Client, group *Group, 
 	res, err := req.Do(ctx, conn)
 	if err != nil {
 		log.Printf("Error indexing group doc %s", err)
-		return
+		return fmt.Errorf("error indexing group doc %s", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
 		log.Printf("error indexing group doc %s", res.String())
-		return
+		return fmt.Errorf("error indexing group doc %s", err)
 	}
 
 	log.Printf("group indexed succesfully")
 	fmt.Printf("group indexed succesfully")
+
+	return nil
 }
 
-func SearchGroupByLocation(ctx context.Context, conn *elasticsearch.Client ,groupName string, location Coords, minRad, maxRad int, tag ...string) *GroupSearchResponse {
+func SearchGroupByLocation(ctx context.Context, conn *elasticsearch.Client, groupName string, location Coords, minRad, maxRad int, tag ...string) *GroupSearchResponse {
 	// [tags] + [use geohash to filter fast closeby areas only] + [user loc + start dis + end dis (with max limit)] + [name]
 
 	// Prepare tags
