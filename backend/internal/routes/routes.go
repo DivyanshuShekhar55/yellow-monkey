@@ -17,9 +17,9 @@ func NewHandler(esconn *elasticsearch.Client) *Handler {
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
-	mux.HandleFunc("GET /health", func( w http.ResponseWriter, r *http.Request,) {
+	mux.HandleFunc("GET /health", func( w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
-	
+
 	mux.HandleFunc("/groups", h.GetAllGroups)
 }

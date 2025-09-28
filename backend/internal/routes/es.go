@@ -24,5 +24,3 @@ func (h *Handler) GetAllGroups(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-
-func (h *Handler) CreateUserIndex() {}

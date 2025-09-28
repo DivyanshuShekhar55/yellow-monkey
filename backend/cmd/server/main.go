@@ -1,16 +1,17 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
-	"github.com/DivyanshuShekhar55/yellow-monkey/backend/internal/es"
+	esmodule "github.com/DivyanshuShekhar55/yellow-monkey/backend/internal/es"
 	"github.com/DivyanshuShekhar55/yellow-monkey/backend/internal/routes"
 )
 
 func main() {
 
-	es := es.ConnectES()
+	es := esmodule.ConnectES()
 	handler := routes.NewHandler(es)
 	
 	mux := http.NewServeMux()
@@ -25,6 +26,8 @@ func main() {
 	app := application{
 		conf: conf,
 	}
+
+	esmodule.CreateGroupIndex(context.Background(), es)
 
 	err := http.ListenAndServe(app.conf.addr, mux)
 
