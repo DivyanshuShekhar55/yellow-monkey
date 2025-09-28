@@ -27,7 +27,7 @@ type GroupSearchResponse struct {
 	Values []Group
 }
 
-func (g *GroupImpl) CreateGroupIndex() {
+func CreateGroupIndex(ctx context.Context, conn *elasticsearch.Client) {
 	index := "groups"
 
 	//check for already existing index:
@@ -35,7 +35,7 @@ func (g *GroupImpl) CreateGroupIndex() {
 		Index: []string{index},
 	}
 
-	res, err := req.Do(context.Background(), g.Conn)
+	res, err := req.Do(ctx, conn)
 	if err != nil {
 		log.Printf("couldn't search for existing group index %s", res)
 		return
@@ -67,7 +67,7 @@ func (g *GroupImpl) CreateGroupIndex() {
 			Body:  strings.NewReader(mapping),
 		}
 
-		res, err := req.Do(context.Background(), g.Conn)
+		res, err := req.Do(ctx, conn)
 		if err != nil {
 			log.Printf("Error creating group index %v", err)
 			return
@@ -91,7 +91,7 @@ func (g *GroupImpl) CreateGroupIndex() {
 
 }
 
-func (g *GroupImpl) InsertGroup(group *Group, refreshStrategy string) {
+func InsertGroup(ctx context.Context, conn *elasticsearch.Client, group *Group, refreshStrategy string) {
 	doc, err := json.Marshal(group)
 	if err != nil {
 		log.Printf("error parsing group %s", err)
@@ -104,7 +104,7 @@ func (g *GroupImpl) InsertGroup(group *Group, refreshStrategy string) {
 		Refresh: refreshStrategy, // "false", "should_wait"
 	}
 
-	res, err := req.Do(context.Background(), g.Conn)
+	res, err := req.Do(ctx, conn)
 	if err != nil {
 		log.Printf("Error indexing group doc %s", err)
 		return
@@ -120,7 +120,7 @@ func (g *GroupImpl) InsertGroup(group *Group, refreshStrategy string) {
 	fmt.Printf("group indexed succesfully")
 }
 
-func (g *GroupImpl) SearchGroupByLocation(groupName string, location Coords, minRad, maxRad int, tag ...string) *GroupSearchResponse {
+func SearchGroupByLocation(ctx context.Context, conn *elasticsearch.Client ,groupName string, location Coords, minRad, maxRad int, tag ...string) *GroupSearchResponse {
 	// [tags] + [use geohash to filter fast closeby areas only] + [user loc + start dis + end dis (with max limit)] + [name]
 
 	// Prepare tags
@@ -173,7 +173,7 @@ func (g *GroupImpl) SearchGroupByLocation(groupName string, location Coords, min
 		TrackTotalHits: "true",
 	}
 
-	res, err := req.Do(context.Background(), g.Conn)
+	res, err := req.Do(ctx, conn)
 	if err != nil {
 		log.Printf("cannot search for group %s", err)
 		return nil
