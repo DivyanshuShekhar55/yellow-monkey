@@ -216,3 +216,54 @@ func (g *GroupImpl) SearchGroupByLocation(groupName string, location Coords, min
 	return search_res
 
 }
+
+func GetAllGroups(ctx context.Context, conn *elasticsearch.Client) (*GroupSearchResponse, error) {
+
+	query := `{
+		"query": {
+			"match_all": {}
+		}
+	}`
+	req := esapi.SearchRequest{
+		Index:          []string{"groups"},
+		Body:           strings.NewReader(query),
+		TrackTotalHits: "true",
+	}
+
+	res, err := req.Do(ctx, conn)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't fetch groups %s", err)
+	}
+
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("error fetching data %s", res.String())
+	}
+
+	var r struct {
+		Hits struct {
+			Total struct {
+				Value int `json:"total"`
+			}
+			Hits []struct {
+				Source Group `json:"_source"`
+			}
+		} `json:"hits"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+		return nil, err
+	}
+
+	var vals []Group
+	for _, hit := range r.Hits.Hits {
+		vals = append(vals, hit.Source)
+	}
+
+	return &GroupSearchResponse{
+		Hits:   r.Hits.Total.Value,
+		Values: vals,
+	}, nil
+
+}
