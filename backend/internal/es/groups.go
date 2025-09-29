@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -25,6 +24,14 @@ type GroupImpl struct {
 type GroupSearchResponse struct {
 	Hits   int
 	Values []Group
+}
+
+type SearchGroupRequestBody struct {
+	Name     *string  `json:"name,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+	Location Coords   `json:"location"`
+	MinRad   int      `json:"min_radius"`
+	MaxRad   int      `json:"max_radius"`
 }
 
 func CreateGroupIndex(ctx context.Context, conn *elasticsearch.Client) {
@@ -122,47 +129,78 @@ func InsertGroup(ctx context.Context, conn *elasticsearch.Client, group *Group, 
 	return nil
 }
 
-func SearchGroupByLocation(ctx context.Context, conn *elasticsearch.Client, groupName string, location Coords, minRad, maxRad int, tag ...string) *GroupSearchResponse {
-	// [tags] + [use geohash to filter fast closeby areas only] + [user loc + start dis + end dis (with max limit)] + [name]
+func SearchGroupByLocation(
+	ctx context.Context,
+	conn *elasticsearch.Client,
+	groupName *string, // optional hai => if non present pointer = nil
+	location Coords,
+	minRad int,
+	maxRad int,
+	tags []string,
+) *GroupSearchResponse {
 
-	// Prepare tags
-	tags := []string{"tag1", "tag2"}
-	tagsJSON, _ := json.Marshal(tags) // becomes: ["tag1","tag2"]
+	// max radius pe 7 km ka limit
+	if maxRad < 7 {
+		maxRad = 7
+	}
 
-	maxRad = max(maxRad, 7)
+	filters := []interface{}{}
+	mustNot := []interface{}{}
+	should := []interface{}{}
 
-	// WARNING : GANDMASTI AHEAD
+	if len(tags) > 0 {
+		filters = append(filters, map[string]interface{}{
+			"terms": map[string]interface{}{
+				"tags": tags,
+			},
+		})
+	}
+
+	filters = append(filters, map[string]interface{}{
+		"geo_distance": map[string]interface{}{
+			"distance": fmt.Sprintf("%dkm", maxRad),
+			"location": map[string]float64{
+				"lat": location.Lat,
+				"lon": location.Lon,
+			},
+		},
+	})
+
+	// minRad >= 0 always
+	if minRad > 0 {
+		mustNot = append(mustNot, map[string]interface{}{
+			"geo_distance": map[string]interface{}{
+				"distance": fmt.Sprintf("%dkm", minRad),
+				"location": map[string]float64{
+					"lat": location.Lat,
+					"lon": location.Lon,
+				},
+			},
+		})
+	}
+
+	if groupName != nil && *groupName != "" {
+		should = append(should, map[string]interface{}{
+			"match": map[string]interface{}{
+				"name": map[string]interface{}{
+					"query": *groupName,
+					"boost": 1.45,
+				},
+			},
+		})
+	}
+
+	// Build the query object
 	queryObj := map[string]interface{}{
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
-				"filter": []interface{}{
-					map[string]interface{}{"terms": map[string]interface{}{"tags": tagsJSON}},
-					map[string]interface{}{
-						"location":   map[string]float64{"lat": location.Lat, "lon": location.Lon},
-						"neighbours": true,
-						"precision":  "2km", // level 6 precision, saves space
-					},
-					map[string]interface{}{
-						"geo_distance_range": map[string]interface{}{
-							"gte":      strconv.Itoa(minRad) + "km",
-							"lte":      strconv.Itoa(maxRad) + "km",
-							"location": map[string]float64{"lat": location.Lat, "lon": location.Lon},
-						},
-					},
-				},
-				"should": []interface{}{
-					map[string]interface{}{
-						"match": map[string]interface{}{
-							"name": map[string]interface{}{
-								"query": groupName,
-								"boost": 1.45,
-							},
-						},
-					},
-				},
+				"filter":   filters,
+				"must_not": mustNot,
+				"should":   should,
 			},
 		},
 	}
+
 	queryBytes, err := json.Marshal(queryObj)
 	if err != nil {
 		log.Printf("error marshalling group search-query %s", err)
@@ -180,7 +218,6 @@ func SearchGroupByLocation(ctx context.Context, conn *elasticsearch.Client, grou
 		log.Printf("cannot search for group %s", err)
 		return nil
 	}
-
 	defer res.Body.Close()
 
 	if res.IsError() {
@@ -188,7 +225,6 @@ func SearchGroupByLocation(ctx context.Context, conn *elasticsearch.Client, grou
 		return nil
 	}
 
-	// parse the response, bhejne se pahle
 	var r struct {
 		Hits struct {
 			Total struct {
@@ -201,22 +237,19 @@ func SearchGroupByLocation(ctx context.Context, conn *elasticsearch.Client, grou
 	}
 
 	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
-		log.Printf("error parsing group-serach response %s", err)
+		log.Printf("error parsing group-search response %s", err)
 		return nil
 	}
 
-	var vals []Group
+	vals := make([]Group, 0, len(r.Hits.Hits))
 	for _, hit := range r.Hits.Hits {
 		vals = append(vals, hit.Source)
 	}
 
-	search_res := &GroupSearchResponse{
+	return &GroupSearchResponse{
 		Hits:   r.Hits.Total.Value,
 		Values: vals,
 	}
-
-	return search_res
-
 }
 
 func GetAllGroups(ctx context.Context, conn *elasticsearch.Client) (*GroupSearchResponse, error) {
