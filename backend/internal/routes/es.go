@@ -39,10 +39,33 @@ func (h *Handler) CreateGroup(w http.ResponseWriter, req *http.Request) {
 	}
 
 	es.InsertGroup(req.Context(), h.ESConn, &r, "wait_for")
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "group created",
 	})
+}
+
+func (h *Handler) SearchGroups(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var r es.SearchGroupRequestBody
+	if err := json.NewDecoder(req.Body).Decode(&r); err != nil {
+		http.Error(w, "bad req body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: ideally should have returned an error too
+	res := es.SearchGroupByLocation(req.Context(), h.ESConn, r.Name, r.Location, r.MinRad, r.MaxRad, r.Tags)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(&res); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 }
