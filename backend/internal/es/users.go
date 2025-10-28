@@ -19,10 +19,12 @@ type Coords struct {
 type User struct {
 	Username string `json:"username"`
 	Location Coords `json:"location"`
+	Age      int    `json:"age"`
+	Gender   string `json:"gender"`
 }
 
 type SearchUserResponse struct {
-	Hits   int64
+	Hits   int
 	Values []User
 }
 
@@ -50,7 +52,7 @@ func (u *UserImpl) CreateUserIndex() {
 
 	if res.StatusCode == 404 {
 		// index does not exists
-		// ideally define more options like nnum of shards and stuff 
+		// ideally define more options like num of shards and stuff
 		mapping := `{
 			"mappings":{
 			
@@ -60,6 +62,12 @@ func (u *UserImpl) CreateUserIndex() {
 					},
 					"location" : {
 						"type" : "geo_point"
+					},
+					"age: {
+						"type": "integer"
+					},
+					"gender": {
+						"type": "keyword"
 					}
 				}
 			}
@@ -172,10 +180,129 @@ func (u *UserImpl) SearchUserByUsername(username string) *SearchUserResponse {
 		vals = append(vals, hit.Source)
 	}
 	users := SearchUserResponse{
-		Hits:   int64(r.Hits.Total.Value),
+		Hits:   r.Hits.Total.Value,
 		Values: vals,
 	}
 
 	return &users
+
+}
+
+func SearchUsersByLocation(ctx context.Context,
+	conn *elasticsearch.Client,
+	location Coords,
+	minRad, maxRad int,
+	minAge, maxAge int,
+	gender string,
+) *SearchUserResponse {
+
+	// max radius ko clamp karna hai to 7kms
+	if maxRad > 7 {
+		maxRad = 7
+	}
+	if maxAge > 60 {
+		maxAge = 60
+	}
+
+	filters := []interface{}{}
+	//should := []interface{}{}
+	mustNot := []interface{}{}
+
+	filters = append(filters, map[string]interface{}{
+		"term": map[string]interface{}{
+			"gender": gender,
+		},
+	})
+
+	filters = append(filters, map[string]interface{}{
+		"range": map[string]interface{}{
+			"age": map[string]interface{}{
+				"gte": minAge,
+				"lte": maxAge,
+			},
+		},
+	})
+
+	filters = append(filters, map[string]interface{}{
+		"geo_distance": map[string]interface{}{
+			"distance": fmt.Sprintf("%dkm", maxRad),
+			"location": map[string]float64{
+				"lat": location.Lat,
+				"lon": location.Lon,
+			},
+		},
+	})
+
+	if minRad >= 0 {
+		mustNot = append(mustNot, map[string]interface{}{
+			"geo_distance": map[string]interface{}{
+				"distance": fmt.Sprintf("%dkm", minRad),
+				"location": map[string]float64{
+					"lat": location.Lat,
+					"lon": location.Lon,
+				},
+			},
+		})
+	}
+
+	// build the query object
+	queryObj := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"filter":   filters,
+				"must_not": mustNot,
+			},
+		},
+	}
+
+	queryBytes, err := json.Marshal(queryObj)
+	if err != nil {
+		log.Printf("error marshalling user search req %v", err)
+		return nil
+	}
+
+	req := esapi.SearchRequest{
+		Index:          []string{"users"},
+		Body:           strings.NewReader(string(queryBytes)),
+		TrackTotalHits: "true",
+	}
+
+	res, err := req.Do(ctx, conn)
+	if err != nil {
+		log.Printf("cannot search for users %s", err)
+		return nil
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		log.Printf("cannot search for users %s", res.String())
+		return nil
+	}
+
+	var r struct {
+		Hits struct {
+			Total struct {
+				Value int `json:"value"`
+			} `json:"total"`
+			Hits []struct {
+				Source User `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+		log.Printf("error parsing user-search response %s", err)
+		return nil
+	}
+
+	vals := make([]User, 0, len(r.Hits.Hits))
+	for _, hit := range r.Hits.Hits {
+		vals = append(vals, hit.Source)
+	}
+
+	return &SearchUserResponse{
+		Hits:   r.Hits.Total.Value,
+		Values: vals,
+	}
 
 }
