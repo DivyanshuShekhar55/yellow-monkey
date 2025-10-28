@@ -12,7 +12,7 @@ const GenderFilterSection = () => {
     return (
         <View style={styles.main}>
 
-            <Text style={{fontWeight:"600", fontSize:24, marginBottom:18}} > Who Do You Want To Date</Text>
+            <Text style={{fontWeight:"600", fontSize:24, marginBottom:18}} >I Want To Date</Text>
 
             <View style={{flexDirection:"row", flexWrap:"wrap", gap:8, marginBottom:12}}>
 

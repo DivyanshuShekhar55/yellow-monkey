@@ -4,6 +4,7 @@ import GenderFilterSection from "../components/GenderFilterSection"
 import AgeFilterSection from "../components/AgeFilterSection"
 import LocationFilterSection from "../components/LocationFilterSection"
 import AdvancedFilterSection from "../components/AdvancedFilterSection"
+import SearchButton from "../components/SearchButton"
 
 export default function Index() {
   const router = useRouter()
@@ -23,6 +24,8 @@ export default function Index() {
       <AgeFilterSection />
       <LocationFilterSection />
       <AdvancedFilterSection />
+
+      <SearchButton/>
 
     </View>
   );
