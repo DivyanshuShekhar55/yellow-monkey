@@ -1,12 +1,28 @@
 import { View, Text } from 'react-native'
-import React from 'react'
+import React, { useState } from 'react'
+import LoadingScreen from '../../components/LoadingScreen'
 
 const index = () => {
-  return (
-    <View>
-      <Text>index</Text>
-    </View>
-  )
+
+    const [fetched, setFetched] = useState(false)
+    const fetch = (filters) => {
+        const url = ""
+    }
+
+    return (
+        <>
+            {!fetched ? (
+                <>
+                    <LoadingScreen />
+                    <Text>fetching</Text>
+                </>
+            ) : (
+                <View>
+                    <Text>index</Text>
+                </View>
+            )}
+        </>
+    )
 }
 
 export default index

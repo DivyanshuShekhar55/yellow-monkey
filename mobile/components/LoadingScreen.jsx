@@ -1,8 +1,9 @@
 import { View, Text } from 'react-native'
-import React from 'react'
+import React, { useRef } from 'react'
 import LottieView from 'lottie-react-native';
 
 const LoadingScreen = () => {
+    const animation = useRef(null);
     return (
         <View style={{
             backgroundColor: '#fff',
@@ -15,10 +16,10 @@ const LoadingScreen = () => {
                 ref={animation}
                 style={{
                     width: 200,
-                    height: 200,
-                    backgroundColor: '#eee',
+                    height: 400,
+                    backgroundColor: '#fff',
                 }}
-                // Find more Lottie files at https://lottiefiles.com/featured
+                
                 source={require('../assets/lottie/loading.json')}
             />
         </View>
