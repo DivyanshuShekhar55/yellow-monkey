@@ -69,3 +69,5 @@ func (h *Handler) SearchGroups(w http.ResponseWriter, req *http.Request) {
 	}
 
 }
+
+

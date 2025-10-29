@@ -20,7 +20,7 @@ func NewESClient() *ESClient {
 
 	return &ESClient{
 		Conn:  conn,
-		Users: &UserImpl{Conn: conn},
+		//Users: &UserImpl{Conn: conn},
 	}
 }
 

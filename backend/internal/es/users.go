@@ -32,7 +32,7 @@ type UserImpl struct {
 	Conn *elasticsearch.Client
 }
 
-func (u *UserImpl) CreateUserIndex() {
+func CreateUserIndex(u *elasticsearch.Client) {
 
 	index := "users"
 
@@ -41,7 +41,7 @@ func (u *UserImpl) CreateUserIndex() {
 		Index: []string{index},
 	}
 
-	res, err := req.Do(context.Background(), u.Conn)
+	res, err := req.Do(context.Background(), u)
 
 	if err != nil {
 		log.Printf("error checking existence of user index %s", err)
@@ -78,7 +78,7 @@ func (u *UserImpl) CreateUserIndex() {
 			Body:  strings.NewReader(mapping),
 		}
 
-		res, err := req.Do(context.Background(), u.Conn)
+		res, err := req.Do(context.Background(), u)
 		if err != nil {
 			log.Printf("Error creating user index %v", err)
 			return
@@ -99,7 +99,7 @@ func (u *UserImpl) CreateUserIndex() {
 	}
 }
 
-func (u *UserImpl) PutUser(user User) {
+func PutUser(user User, u *elasticsearch.Client) {
 	doc, err := json.Marshal(user)
 	if err != nil {
 		log.Printf("error marshalling user schema %s", err)
@@ -112,7 +112,7 @@ func (u *UserImpl) PutUser(user User) {
 		Refresh: "false",
 	}
 
-	res, err := req.Do(context.Background(), u.Conn)
+	res, err := req.Do(context.Background(), u)
 	if err != nil {
 		log.Printf("Error indexing user doc %s", err)
 		return
@@ -129,7 +129,7 @@ func (u *UserImpl) PutUser(user User) {
 
 }
 
-func (u *UserImpl) SearchUserByUsername(username string) *SearchUserResponse {
+func SearchUserByUsername(username string, u *elasticsearch.Client) *SearchUserResponse {
 
 	// this is better than using sprintf
 	query, _ := json.Marshal(map[string]interface{}{
@@ -146,7 +146,7 @@ func (u *UserImpl) SearchUserByUsername(username string) *SearchUserResponse {
 		TrackTotalHits: "true",
 	}
 
-	res, err := req.Do(context.Background(), u.Conn)
+	res, err := req.Do(context.Background(), u)
 	if err != nil {
 		log.Printf("error searching user doc %s", err)
 		return nil
