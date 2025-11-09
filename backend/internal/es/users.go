@@ -23,6 +23,15 @@ type User struct {
 	Gender   string `json:"gender"`
 }
 
+type SearchUserRequest struct {
+	Location Coords `json:"location"`
+	MinRad   int    `json:"min_rad"`
+	MaxRad   int    `json:"max_rad"`
+	MinAge   int    `json:"min_age"`
+	MaxAge   int    `json:"max_age"`
+	Gender   string `json:"gender"`
+}
+
 type SearchUserResponse struct {
 	Hits   int
 	Values []User
@@ -56,14 +65,14 @@ func CreateUserIndex(u *elasticsearch.Client) {
 		mapping := `{
 			"mappings":{
 			
-				"properties" : {
-					"username" : {
-						"type" : "text"
+				"properties": {
+					"username": {
+						"type": "text"
 					},
-					"location" : {
-						"type" : "geo_point"
+					"location": {
+						"type": "geo_point"
 					},
-					"age: {
+					"age": {
 						"type": "integer"
 					},
 					"gender": {
@@ -190,18 +199,19 @@ func SearchUserByUsername(username string, u *elasticsearch.Client) *SearchUserR
 
 func SearchUsersByLocation(ctx context.Context,
 	conn *elasticsearch.Client,
-	location Coords,
-	minRad, maxRad int,
-	minAge, maxAge int,
-	gender string,
-) *SearchUserResponse {
+	// location Coords,
+	// minRad, maxRad int,
+	// minAge, maxAge int,
+	// gender string,
+	req SearchUserRequest,
+) (*SearchUserResponse, error) {
 
 	// max radius ko clamp karna hai to 7kms
-	if maxRad > 7 {
-		maxRad = 7
+	if req.MaxRad > 7 {
+		req.MaxRad = 7
 	}
-	if maxAge > 60 {
-		maxAge = 60
+	if req.MaxAge > 60 {
+		req.MaxAge = 60
 	}
 
 	filters := []interface{}{}
@@ -210,36 +220,36 @@ func SearchUsersByLocation(ctx context.Context,
 
 	filters = append(filters, map[string]interface{}{
 		"term": map[string]interface{}{
-			"gender": gender,
+			"gender": req.Gender,
 		},
 	})
 
 	filters = append(filters, map[string]interface{}{
 		"range": map[string]interface{}{
 			"age": map[string]interface{}{
-				"gte": minAge,
-				"lte": maxAge,
+				"gte": req.MinAge,
+				"lte": req.MaxAge,
 			},
 		},
 	})
 
 	filters = append(filters, map[string]interface{}{
 		"geo_distance": map[string]interface{}{
-			"distance": fmt.Sprintf("%dkm", maxRad),
+			"distance": fmt.Sprintf("%dkm", req.MaxRad),
 			"location": map[string]float64{
-				"lat": location.Lat,
-				"lon": location.Lon,
+				"lat": req.Location.Lat,
+				"lon": req.Location.Lon,
 			},
 		},
 	})
 
-	if minRad >= 0 {
+	if req.MinRad >= 0 {
 		mustNot = append(mustNot, map[string]interface{}{
 			"geo_distance": map[string]interface{}{
-				"distance": fmt.Sprintf("%dkm", minRad),
+				"distance": fmt.Sprintf("%dkm", req.MinRad),
 				"location": map[string]float64{
-					"lat": location.Lat,
-					"lon": location.Lon,
+					"lat": req.Location.Lat,
+					"lon": req.Location.Lon,
 				},
 			},
 		})
@@ -258,25 +268,25 @@ func SearchUsersByLocation(ctx context.Context,
 	queryBytes, err := json.Marshal(queryObj)
 	if err != nil {
 		log.Printf("error marshalling user search req %v", err)
-		return nil
+		return nil, err
 	}
 
-	req := esapi.SearchRequest{
+	es_req := esapi.SearchRequest{
 		Index:          []string{"users"},
 		Body:           strings.NewReader(string(queryBytes)),
 		TrackTotalHits: "true",
 	}
 
-	res, err := req.Do(ctx, conn)
+	res, err := es_req.Do(ctx, conn)
 	if err != nil {
 		log.Printf("cannot search for users %s", err)
-		return nil
+		return nil, err
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
 		log.Printf("cannot search for users %s", res.String())
-		return nil
+		return nil, err
 	}
 
 	var r struct {
@@ -292,7 +302,7 @@ func SearchUsersByLocation(ctx context.Context,
 
 	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
 		log.Printf("error parsing user-search response %s", err)
-		return nil
+		return nil, err
 	}
 
 	vals := make([]User, 0, len(r.Hits.Hits))
@@ -303,6 +313,6 @@ func SearchUsersByLocation(ctx context.Context,
 	return &SearchUserResponse{
 		Hits:   r.Hits.Total.Value,
 		Values: vals,
-	}
+	}, nil
 
 }

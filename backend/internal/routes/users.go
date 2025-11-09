@@ -28,6 +28,26 @@ func (h *Handler) CreateUser(w http.ResponseWriter, req *http.Request) {
 
 }
 
-func(h *Handler) SearchUsersByLocation(){
-	
+func (h *Handler) SearchUsersByLocation(w http.ResponseWriter, req *http.Request) {
+
+	// post because we are sending some amount of data
+	if req.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var r es.SearchUserRequest
+	if err := json.NewDecoder(req.Body).Decode(&r); err != nil {
+		http.Error(w, "Invalid Input format", http.StatusBadRequest)
+		return
+	}
+
+	res, err := es.SearchUsersByLocation(req.Context(), h.ESConn, r)
+	if err != nil {
+		http.Error(w, "Couldnt search users", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
 }

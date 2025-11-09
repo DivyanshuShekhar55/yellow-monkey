@@ -28,6 +28,7 @@ func main() {
 	}
 
 	esmodule.CreateGroupIndex(context.Background(), es)
+	esmodule.CreateUserIndex(es)
 
 	err := http.ListenAndServe(app.conf.addr, mux)
 
