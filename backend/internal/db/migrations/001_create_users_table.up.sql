@@ -4,5 +4,5 @@ CREATE TABLE users (
     age INT NOT NULL,
     gender VARCHAR(15) NOT NULL,
     location_lat FLOAT NOT NULL,
-    location_lon 
+    location_lon FLOAT NOT NULL
 );
