@@ -8,22 +8,10 @@ services:
       - discovery.type=single-node
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
-      - bootstrap.memory_lock=true
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
     ports:
       - "9200:9200"
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
     networks:
       - elastic
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   postgres:
     image: postgres:16
@@ -32,35 +20,58 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: pass
       POSTGRES_DB: dbname
+    command: ["postgres", "-c", "wal_level=logical"]
     ports:
       - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
     networks:
       - elastic
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d dbname"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   migrate:
     image: migrate/migrate
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     volumes:
       - ./internal/db/migrations:/migrations
     networks:
       - elastic
     command: ["-path", "/migrations", "-database", "postgres://user:pass@postgres:5432/dbname?sslmode=disable", "up"]
 
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    ports:
+      - "9092:9092"
+    networks:
+      - elastic
+
+  kafka-connect:
+    image: debezium/connect:latest
+    container_name: kafka-connect
+    depends_on:
+      - kafka
+      - postgres
+      - elasticsearch
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+    ports:
+      - "8083:8083"
+    networks:
+      - elastic
+
 networks:
   elastic:
     driver: bridge
-
-volumes:
-  elasticsearch_data:
-    driver: local
-  pgdata:
-    driver: local
