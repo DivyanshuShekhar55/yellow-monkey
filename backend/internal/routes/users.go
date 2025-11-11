@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/DivyanshuShekhar55/yellow-monkey/backend/internal/db"
 	"github.com/DivyanshuShekhar55/yellow-monkey/backend/internal/es"
 )
 
-func (h *Handler) CreateUser(w http.ResponseWriter, req *http.Request) {
+func (h *Handler) CreateUserES(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -23,7 +24,28 @@ func (h *Handler) CreateUser(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
-		"message": "group created",
+		"message": "user created",
+	})
+
+}
+
+func (h *Handler) CreateUserPG(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var r db.User
+	if err := json.NewDecoder(req.Body).Decode(&r); err != nil {
+		http.Error(w, "invalid req body", http.StatusBadRequest)
+		return
+	}
+
+	db.InsertUser(r, req.Context(), h.PGpool)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "success",
+		"message": "user created",
 	})
 
 }

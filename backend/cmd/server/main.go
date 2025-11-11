@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/DivyanshuShekhar55/yellow-monkey/backend/internal/db"
 	esmodule "github.com/DivyanshuShekhar55/yellow-monkey/backend/internal/es"
 	"github.com/DivyanshuShekhar55/yellow-monkey/backend/internal/routes"
 )
@@ -12,15 +13,18 @@ import (
 func main() {
 
 	es := esmodule.ConnectES()
-	handler := routes.NewHandler(es)
-	
+	ctx := context.Background()
+	pool := db.ConnectPG(ctx)
+
+	handler := routes.NewHandler(es, pool)
+
 	mux := http.NewServeMux()
 	handler.Register(mux)
 
-
 	conf := config{
-		addr: ":6969",
-		es:   es,
+		addr:   ":6969",
+		es:     es,
+		pgpool: pool,
 	}
 
 	app := application{
