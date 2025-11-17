@@ -37,7 +37,7 @@ services:
     command: ["-path", "/migrations", "-database", "postgres://user:pass@postgres:5432/dbname?sslmode=disable", "up"]
 
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
     environment:
       KAFKA_NODE_ID: 1
@@ -55,7 +55,7 @@ services:
       - elastic
 
   kafka-connect:
-    image: debezium/connect:latest
+    image: debezium/connect:2.5
     container_name: kafka-connect
     depends_on:
       - kafka

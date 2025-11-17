@@ -22,7 +22,7 @@ type User struct {
 }
 
 func ConnectPG(ctx context.Context) *pgxpool.Pool {
-	pool, err := pgxpool.New(ctx, "postgres://user:passw@localhost:5432/dbname")
+	pool, err := pgxpool.New(ctx, "postgres://user:pass@localhost:5432/dbname?sslmode=disable")
 	if err != nil {
 		log.Fatal("couldn't connect to postgres", err)
 	}
